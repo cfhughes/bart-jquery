@@ -10,34 +10,70 @@
         integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <script src="https://code.jquery.com/jquery-3.3.1.min.js" crossorigin="anonymous"></script>
     <script>
-        $(document).ready(function () {
-            setInterval(function () {
-                $.get('http://api.bart.gov/api/etd.aspx?cmd=etd&orig=19th&key=MW9S-E7SL-26DU-VV8V&json=y', function (data) {
-                    console.log(data);
-                    $("#station-name").html(data.root.station[0].name);
-                    var card = "";
-                    for (route of data.root.station[0].etd) {
-                        card += `
+        class BartData {
+            constructor(rawData) {
+                this.station_name = rawData.root.station[0].name;
+                this.routes = rawData.root.station[0].etd.map(function (routeRaw) {
+                    return new Route(routeRaw);
+                });
+            }
+            routesHTML() {
+                var result = "";
+                this.routes.forEach(function (route) {
+                    result += route.html();
+                })
+                return result;
+            }
+        }
+
+        class Route {
+            constructor(routeRaw) {
+                this.destination = routeRaw.destination;
+                this.trains = routeRaw.estimate.map(function (trainRaw) {
+                    return new Train(trainRaw);
+                });
+            }
+            html() {
+                var result = `
                     <div class="card">
                         <div class="card-body">
                             <h5 class="card-title">
-                                ${route.destination}
+                                ${this.destination}
                             </h5>`;
-                        for (train of route.estimate) {
-                            card += `<div style="background-color:${train.hexcolor}">
-                                <p>${train.minutes} minutes - Platform ${train.platform}</p>
-                            </div>`;
-                        }
-                        card += `
+                this.trains.forEach(function (train) { result += train.html() });
+                result += `
                         </div>
                     </div>
-                    `;
-                    }
-                    $('#routes').html(card);
-                });
-            }, 5000);
+                    `
+                return result;
+            }
         }
-        );
+
+        class Train {
+            constructor(trainRaw) {
+                this.hexcolor = trainRaw.hexcolor;
+                this.minutes = trainRaw.minutes;
+                this.platform = trainRaw.platform;
+            }
+            html() {
+                return `<div style="background-color:${this.hexcolor}">
+                            <p>${this.minutes} minutes - Platform ${this.platform}</p>
+                        </div>`;
+            }
+        }
+
+        function renderData(data) {
+            console.log(data);
+            var bartData = new BartData(data);
+            $("#station-name").html(bartData.station_name);
+            $('#routes').html(bartData.routesHTML());
+        }
+
+        $(document).ready(function () {
+            setInterval(function () {
+                $.get('http://api.bart.gov/api/etd.aspx?cmd=etd&orig=19th&key=MW9S-E7SL-26DU-VV8V&json=y',renderData);
+            }, 5000);
+        });
     </script>
 </head>
 
